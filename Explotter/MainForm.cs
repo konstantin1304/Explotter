@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -13,12 +15,12 @@ namespace Explotter
 {
     public partial class MainForm : Form
     {
-        string currentPath="";
+        string currentPath = "";
         const int WM_DEVICECHANGE = 0x219;
         const int DBT_DEVICEARRIVAL = 0x8000;
         const int DBT_DEVICEREMOVECOMPLETE = 0x8004;
         ListView activeList;
-
+      
         public MainForm()
         {
             InitializeComponent();
@@ -60,12 +62,43 @@ namespace Explotter
             {
                 ToolStripButton btn = new ToolStripButton
                 {
-                    Text = drive,
-                    DisplayStyle = ToolStripItemDisplayStyle.Text
+                    Image = IconHelper.ExtractAssociatedIcon(drive).ToBitmap(),
+                    Text = drive.Substring(0,1),
+                    Tag = drive,
+                    DisplayStyle = ToolStripItemDisplayStyle.ImageAndText
                 };
                 toolStrip1.Items.Add(btn);
-                btn.Click += (s, a) => EnterDrive((s as ToolStripButton).Text);                
+                btn.Click += (s, a) => EnterDrive((s as ToolStripButton).Tag as string);                
             }
+            toolStrip1.Items.Add(new ToolStripSeparator());
+            ToolStripButton btnBack = new ToolStripButton
+            {
+                Text = "UP",
+                DisplayStyle = ToolStripItemDisplayStyle.Text
+            };
+            toolStrip1.Items.Add(btnBack);
+            btnBack.Click += (s, a) => Backspace();
+
+            toolStrip1.Items.Add(new ToolStripSeparator());
+            ToolStripButton btnPrc = new ToolStripButton
+            {
+                Text = "Process List",
+                DisplayStyle = ToolStripItemDisplayStyle.Text
+            };
+            toolStrip1.Items.Add(btnPrc);
+            btnPrc.Click += (s, a) =>
+            {
+                {
+                    Process[] procList = Process.GetProcesses();
+                    string sList = "";
+                    foreach (var item in procList)
+                    {
+                        sList += item.ProcessName + "\t";
+                    }
+                    MessageBox.Show(sList);
+
+                };
+            };
         }
         /// <summary>
         /// Enters directory of the active list 
@@ -79,8 +112,13 @@ namespace Explotter
             {
                 currentPath = newPath;
                 activeList.Tag = currentPath;
-                FillList(currentPath);
+                FillList(new DirectoryInfo(currentPath));
             }
+            else
+            {
+                Process.Start(newPath);
+            }
+
         }
         /// <summary>
         /// Enters drive of the active list
@@ -90,23 +128,35 @@ namespace Explotter
         {
             currentPath = drive;
             activeList.Tag = currentPath;
-            FillList(currentPath);
+            FillList(new DirectoryInfo(currentPath));
+        }
+        /// <summary>
+        /// Up one level
+        /// </summary>
+        public void Backspace()
+        {
+            DirectoryInfo pDir = new DirectoryInfo(currentPath).Parent;
+            if (pDir == null)
+            {
+                return;
+            }
+            currentPath = pDir.FullName;
+            activeList.Tag = currentPath;
+            FillList(pDir);
         }
         /// <summary>
         /// Shows the contents of the current directory.
         /// </summary>
         /// <param name="path">path</param>
-        private void FillList(string path)
+        private void FillList(DirectoryInfo dir)
         {
             activeList.Items.Clear();
-            DirectoryInfo dir = new DirectoryInfo(path);
-           
+                     
             imageListSmall.Images.Clear();
             
             foreach (DirectoryInfo di in dir.GetDirectories())
             {
-                //if(di.Name.IndexOf('$')!=0)
-                //imageListSmall.Images.Add(di.Name, Icon.ExtractAssociatedIcon(Path.GetFullPath(di.FullName)));
+                imageListSmall.Images.Add(di.Name, IconHelper.ExtractAssociatedIcon(Path.GetFullPath(di.FullName)));
 
                 activeList.Items.Add(new ListViewItem
                 {
@@ -126,6 +176,7 @@ namespace Explotter
                 });
             }
         }
+        
         /// <summary>
         /// Double-clicking opens the folder
         /// </summary>
@@ -155,5 +206,7 @@ namespace Explotter
             activeList = driveListView2;
             currentPath = activeList.Tag as string;
         }
+
+       
     }
 }
